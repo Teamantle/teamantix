@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Générateur de codes d'équipe – certitudes.org</title>
+<style>
+  :root { --bg:#16181d; --card:#22252d; --fg:#e8e8ea; --mut:#9aa0aa; --acc:#4caf7d; --err:#e36363; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:820px; margin:auto; padding:24px 16px; }
+  h1 { font-size:1.4em; margin:0 0 4px; }
+  p.sub { color:var(--mut); margin:0 0 20px; }
+  .game { background:var(--card); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .name { font-weight:700; width:90px; }
+  input[type=number] { width:80px; }
+  input, textarea, button { font:inherit; background:#2d313b; color:var(--fg); border:1px solid #3a3f4b; border-radius:6px; padding:5px 8px; }
+  button { cursor:pointer; background:var(--acc); border:none; color:#08130d; font-weight:600; }
+  button.sec { background:#3a3f4b; color:var(--fg); font-weight:400; }
+  button:disabled { opacity:.5; cursor:default; }
+  textarea { width:100%; box-sizing:border-box; height:70px; font-family:monospace; font-size:.8em; margin-top:8px; }
+  details summary { cursor:pointer; color:var(--mut); font-size:.9em; margin-top:8px; }
+  .code { font-family:monospace; font-size:1.15em; background:#111; padding:4px 10px; border-radius:6px; user-select:all; }
+  .ok { color:var(--acc); } .err { color:var(--err); } .mut { color:var(--mut); font-size:.9em; }
+  .out { margin-top:10px; min-height:1.4em; }
+  #all { margin-bottom:18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Générateur de codes d'équipe</h1>
+  <p class="sub">Reproduit le bouton « Start » de Collaborate : crée l'équipe du jour dans Firebase et affiche le code à coller dans « Join ».</p>
+  <button id="all">Générer tous les codes</button>
+  <div id="games"></div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+// Numéros relevés le 13/11/2026 à 16h07 (Paris), puis +1 à chaque changement de jour.
+// Jeux anglais : bascule à 20:00 UTC (data-utc-time="72000").
+// Jeux français : bascule à minuit heure de Paris (hypothèse).
+const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
+const REF = {
+  pedantle: { num: 1639, utcSec: 72000 },
+  cemantle: { num: 1684, utcSec: 72000 },
+  cemantix: { num: 1717, tz: "Europe/Paris" },
+  pedantix: { num: 1645, tz: "Europe/Paris" },
+};
+function dayIndex(r, t) {
+  if (r.tz) {
+    const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: r.tz })
+      .format(t).split("-").map(Number);
+    return Date.UTC(y, m - 1, d) / 86400000;
+  }
+  return Math.floor((t / 1000 - r.utcSec) / 86400);
+}
+const todayNum = (id) => REF[id].num + dayIndex(REF[id], Date.now()) - dayIndex(REF[id], ANCHOR);
+
+const GAMES = [
+  { id: "pedantle", url: "https://pedantle.certitudes.org", num: todayNum("pedantle"),
+    config: {
+      apiKey: "AIzaSyCB2puemt9DxsXtohEDb3RZSz6M2mJFPfo",
+      authDomain: "pedantle-c5c98.firebaseapp.com",
+      databaseURL: "https://pedantle-c5c98-default-rtdb.firebaseio.com",
+      projectId: "pedantle-c5c98",
+      storageBucket: "pedantle-c5c98.firebasestorage.app",
+      messagingSenderId: "666394869768",
+      appId: "1:666394869768:web:ea705835cc8782b0fad1bd",
+    } },
+  { id: "cemantle", url: "https://cemantle.certitudes.org", num: todayNum("cemantle"),
+    config: {
+      apiKey: "AIzaSyDJHE5kysxVrJkptZR8j9ayvVef4yysme4",
+      authDomain: "cemantle.firebaseapp.com",
+      databaseURL: "https://cemantle-default-rtdb.firebaseio.com",
+      projectId: "cemantle",
+      storageBucket: "cemantle.appspot.com",
+      messagingSenderId: "233621755818",
+      appId: "1:233621755818:web:348576e322f92e5118bdd3",
+    } },
+  { id: "cemantix", url: "https://cemantix.certitudes.org", num: todayNum("cemantix"),
+    config: {
+      apiKey: "AIzaSyAuNU0MeepN6M6DRy-RK-dvIpmB-bjST1U",
+      authDomain: "cemantix-11e28.firebaseapp.com",
+      databaseURL: "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "cemantix-11e28",
+      storageBucket: "cemantix-11e28.appspot.com",
+      messagingSenderId: "1088014539886",
+      appId: "1:1088014539886:web:231597d11afb37f168da7f",
+    } },
+  { id: "pedantix", url: "https://pedantix.certitudes.org", num: todayNum("pedantix"),
+    config: {
+      apiKey: "AIzaSyDq7TrnVnWmKLwdoz_r2HGbAAek3dML26c",
+      authDomain: "pedantix-32f5c.firebaseapp.com",
+      databaseURL: "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "pedantix-32f5c",
+      storageBucket: "pedantix-32f5c.firebasestorage.app",
+      messagingSenderId: "1076942114014",
+      appId: "1:1076942114014:web:342b77337c5545ed1f064f",
+    } },
+];
+
+// Numéro mémorisé {num, t} → avance automatiquement d'un par jour écoulé
+function savedNum(id) {
+  try {
+    const s = JSON.parse(store.get(id + "/numday"));
+    if (s && s.num) return s.num + Math.floor((Date.now() - s.t) / 86400000);
+  } catch {}
+  return "";
+}
+
+const store = {
+  get: (k) => { try { return localStorage.getItem("teamgen/" + k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem("teamgen/" + k, v); } catch {} },
+};
+
+// Accepte un objet JS collé tel quel (firebaseConfig:{...}) ou du JSON
+function parseConfig(txt) {
+  txt = txt.trim().replace(/^firebaseConfig\s*:\s*/, "").replace(/[,;]\s*$/, "");
+  if (!txt) return null;
+  return new Function("return (" + txt + ")")();
+}
+
+const withTimeout = (p, ms, msg) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+
+const apps = {};
+function dbFor(g, cfg) {
+  const key = g.id + "|" + cfg.databaseURL;
+  if (!apps[key]) apps[key] = getDatabase(initializeApp(cfg, key));
+  return apps[key];
+}
+
+async function generate(g, el) {
+  const out = el.querySelector(".out");
+  const btn = el.querySelector(".gen");
+  const n = parseInt(el.querySelector(".num").value, 10);
+  let cfg;
+  try { cfg = parseConfig(el.querySelector("textarea").value); }
+  catch (e) { out.innerHTML = `<span class="err">Config invalide : ${e.message}</span>`; return; }
+  if (!cfg || !cfg.databaseURL) { out.innerHTML = `<span class="err">Il manque la firebaseConfig (avec databaseURL).</span>`; return; }
+  if (!n) { out.innerHTML = `<span class="err">Il manque le numéro du jour.</span>`; return; }
+  store.set(g.id + "/config", el.querySelector("textarea").value);
+
+  btn.disabled = true;
+  out.innerHTML = `<span class="mut">Création…</span>`;
+  try {
+    const db = dbFor(g, cfg);
+    // Exactement comme le site : push sous g/<n>, puis _users = 1
+    const teamRef = push(ref(db, `g/${n}`));
+    await withTimeout(set(ref(db, `g/${n}/${teamRef.key}/_users`), 1), 10000, "délai dépassé (écriture bloquée ?)");
+    const snap = await withTimeout(get(ref(db, `g/${n}/${teamRef.key}`)), 10000, "délai dépassé (lecture)");
+    if (!snap.exists()) throw new Error("l'équipe n'apparaît pas après écriture");
+    const code = teamRef.key.replace(/-/g, "Ô");
+    out.innerHTML = `<span class="code">${code}</span> <button class="sec copy">Copier</button>
+      <span class="ok">✔ équipe créée (jour ${n})</span>
+      <a class="mut" href="${g.url}" target="_blank" rel="noopener">ouvrir ${g.id} ↗</a>`;
+    out.querySelector(".copy").onclick = async (e) => {
+      try { await navigator.clipboard.writeText(code); e.target.textContent = "Copié"; } catch {}
+    };
+  } catch (e) {
+    out.innerHTML = `<span class="err">Erreur : ${e.code || ""} ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+const root = document.getElementById("games");
+for (const g of GAMES) {
+  const el = document.createElement("div");
+  el.className = "game";
+  const savedCfg = store.get(g.id + "/config");
+  const cfgTxt = savedCfg || (g.config ? JSON.stringify(g.config, null, 1) : "");
+  const num = g.num;
+  el.innerHTML = `
+    <div class="row">
+      <span class="name">${g.id}</span>
+      <label class="mut">Jour n° <input type="number" class="num" value="${num}"></label>
+      <button class="gen">Générer le code</button>
+    </div>
+    <details ${cfgTxt ? "" : "open"}>
+      <summary>firebaseConfig ${cfgTxt ? "(renseignée)" : "— à coller depuis " + g.id + ".js"}</summary>
+      <textarea spellcheck="false" placeholder="{ apiKey: '...', databaseURL: 'https://...firebaseio.com', ... }"></textarea>
+    </details>
+    <div class="out"></div>`;
+  el.querySelector("textarea").value = cfgTxt;
+  el.querySelector(".gen").onclick = () => generate(g, el);
+  g.el = el;
+  root.appendChild(el);
+}
+
+
+
+document.getElementById("all").onclick = () => {
+  for (const g of GAMES) if (g.el.querySelector("textarea").value.trim()) generate(g, g.el);
+};
+</script>
+</body>
+</html>
