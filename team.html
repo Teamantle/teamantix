@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teamantix – codes de la team</title>
+<style>
+  :root { --bg:#16181d; --card:#22252d; --fg:#e8e8ea; --mut:#9aa0aa; --acc:#4caf7d; --err:#e36363; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:640px; margin:auto; padding:24px 16px; }
+  h1 { font-size:1.4em; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 20px; }
+  .game { background:var(--card); border-radius:10px; padding:14px 16px; margin-bottom:12px;
+          display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .name { font-weight:700; width:90px; }
+  .num { color:var(--mut); width:70px; }
+  .code { font-family:monospace; font-size:1.1em; background:#111; padding:4px 10px; border-radius:6px; user-select:all; }
+  input, button { font:inherit; border-radius:6px; padding:6px 10px; }
+  input { background:#2d313b; color:var(--fg); border:1px solid #3a3f4b; width:60%; }
+  button { cursor:pointer; background:var(--acc); border:none; color:#08130d; font-weight:600; }
+  button.sec { background:#3a3f4b; color:var(--fg); font-weight:400; }
+  a { color:var(--mut); }
+  .err { color:var(--err); } .warn { color:#e0b050; }
+  #login { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Teamantix · codes de la team</h1>
+  <p class="sub" id="status">Chargement…</p>
+
+  <div id="login">
+    <input id="pass" type="password" placeholder="Phrase secrète de la team">
+    <button id="ok">Déverrouiller</button>
+  </div>
+
+  <div id="codes"></div>
+  <p class="sub" id="foot"></p>
+</main>
+
+<script>
+const URLS = {
+  pedantle: "https://pedantle.certitudes.org",
+  cemantle: "https://cemantle.certitudes.org",
+  cemantix: "https://cemantix.certitudes.org",
+  pedantix: "https://pedantix.certitudes.org",
+};
+const $ = (id) => document.getElementById(id);
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+async function decrypt(enc, pass) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64(enc.salt), iterations: enc.iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.data));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+function render(p) {
+  const gen = new Date(p.generated);
+  const ageH = (Date.now() - gen) / 36e5;
+  $("status").innerHTML = `Codes générés le ${gen.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}` +
+    (ageH > 26 ? ` <span class="warn">— pas encore mis à jour aujourd'hui</span>` : "");
+  $("codes").innerHTML = "";
+  for (const [game, c] of Object.entries(p.codes)) {
+    const el = document.createElement("div");
+    el.className = "game";
+    el.innerHTML = `<span class="name">${game}</span><span class="num">n° ${c.num}</span>` +
+      (c.code
+        ? `<span class="code">${c.code}</span> <button class="sec">Copier</button>
+           <a href="${URLS[game]}" target="_blank" rel="noopener">jouer ↗</a>`
+        : `<span class="err">indisponible (${c.error})</span>`);
+    const btn = el.querySelector("button");
+    if (btn) btn.onclick = async () => {
+      try { await navigator.clipboard.writeText(c.code); btn.textContent = "Copié"; } catch {}
+    };
+    $("codes").appendChild(el);
+  }
+  $("foot").innerHTML = `Dans le jeu : ☁️ › colle le code › Join. <a href="#" id="logout">Oublier la phrase</a>`;
+  $("logout").onclick = (e) => { e.preventDefault(); store.del("teamantix/pass"); location.hash = ""; location.reload(); };
+}
+
+async function main() {
+  let enc;
+  try {
+    enc = await (await fetch("codes.json?t=" + Date.now(), { cache: "no-store" })).json();
+  } catch {
+    $("status").innerHTML = `<span class="err">Aucun code publié pour l'instant.</span>`;
+    return;
+  }
+  const fromHash = (location.hash.match(/k=([^&]+)/) || [])[1];
+  if (fromHash) {
+    store.set("teamantix/pass", decodeURIComponent(fromHash));
+    history.replaceState(null, "", location.pathname); // retire la phrase de la barre d'adresse
+  }
+
+  async function tryPass(pass) {
+    try {
+      render(await decrypt(enc, pass));
+      store.set("teamantix/pass", pass);
+      $("login").style.display = "none";
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const saved = store.get("teamantix/pass");
+  if (saved && await tryPass(saved)) return;
+
+  $("status").textContent = saved ? "Phrase secrète incorrecte." : "Entre la phrase secrète de la team.";
+  $("login").style.display = "block";
+  const submit = async () => {
+    if (!(await tryPass($("pass").value))) $("status").textContent = "Phrase secrète incorrecte.";
+  };
+  $("ok").onclick = submit;
+  $("pass").onkeydown = (e) => { if (e.key === "Enter") submit(); };
+}
+main();
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Générateur de codes d'équipe – certitudes.org</title>
+<title>Teamantix</title>
 <style>
   :root { --bg:#16181d; --card:#22252d; --fg:#e8e8ea; --mut:#9aa0aa; --acc:#4caf7d; --err:#e36363; }
   body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); }
@@ -28,8 +28,8 @@
 </head>
 <body>
 <main>
-  <h1>Générateur de codes d'équipe</h1>
-  <p class="sub">Reproduit le bouton « Start » de Collaborate : crée l'équipe du jour dans Firebase et affiche le code à coller dans « Join ».</p>
+  <h1>Teamantix</h1>
+  <p class="sub">Une équipe en un clic pour cemantle, cémantix, pedantle et pédantix. Génère le code du jour, partage-le, et tes amis n'ont plus qu'à le coller dans ☁️ › Join.</p>
   <button id="all">Générer tous les codes</button>
   <div id="games"></div>
 </main>
@@ -44,7 +44,7 @@ import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/fireba
 const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
 const REF = {
   // Changement de jour pour tous les jeux à 01:00 UTC (3600 s)
-  pedantle: { num: 1640, utcSec: 3600 },
+  pedantle: { num: 1639, utcSec: 3600 },
   cemantle: { num: 1684, utcSec: 3600 },
   cemantix: { num: 1717, utcSec: 3600 },
   pedantix: { num: 1645, utcSec: 3600 },
