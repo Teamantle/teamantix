@@ -7,6 +7,7 @@ import base64
 import json
 import os
 import random
+import re
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -19,11 +20,16 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 ANCHOR = datetime(2026, 11, 13, 15, 7, tzinfo=timezone.utc).timestamp()
 RESET_SEC = 3600
 
+# jeu: (numéro de référence pour le secours, page du jeu, base Firebase)
 GAMES = {
-    "pedantle": (1639, "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
-    "cemantle": (1684, "https://cemantle-default-rtdb.firebaseio.com"),
-    "cemantix": (1717, "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app"),
-    "pedantix": (1645, "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app"),
+    "pedantle": (1639, "https://pedantle.certitudes.org/",
+                 "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
+    "cemantle": (1684, "https://cemantle.certitudes.org/",
+                 "https://cemantle-default-rtdb.firebaseio.com"),
+    "cemantix": (1717, "https://cemantix.certitudes.org/",
+                 "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app"),
+    "pedantix": (1645, "https://pedantix.certitudes.org/",
+                 "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app"),
 }
 
 PBKDF2_ITER = 200_000
@@ -36,6 +42,17 @@ def day_index(t: float) -> int:
 
 def today_num(ref: int) -> int:
     return ref + day_index(time.time()) - day_index(ANCHOR)
+
+
+def site_num(url: str) -> int:
+    """Lit data-puzzle-number directement sur la page du jeu."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (teamantix)"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        html = r.read().decode("utf-8", "replace")
+    m = re.search(r'data-puzzle-number="(\d+)"', html)
+    if not m:
+        raise RuntimeError("numéro introuvable dans la page")
+    return int(m.group(1))
 
 
 def push_id() -> str:
@@ -77,8 +94,12 @@ def encrypt(payload: dict, passphrase: str) -> dict:
 def main():
     passphrase = os.environ["TEAM_PASSPHRASE"]
     codes = {}
-    for game, (ref, db) in GAMES.items():
-        n = today_num(ref)
+    for game, (ref, url, db) in GAMES.items():
+        try:
+            n, how = site_num(url), "site"
+        except Exception as e:
+            n, how = today_num(ref), f"calcul (site KO : {e})"
+        print(f"{game}: jour n° {n} via {how}")
         try:
             codes[game] = {"num": n, "code": create_team(db, n)}
             print(f"{game} #{n}: OK")
