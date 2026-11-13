@@ -43,10 +43,11 @@ import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/fireba
 // Jeux français : bascule à minuit heure de Paris (hypothèse).
 const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
 const REF = {
-  pedantle: { num: 1639, utcSec: 72000 },
-  cemantle: { num: 1684, utcSec: 72000 },
-  cemantix: { num: 1717, tz: "Europe/Paris" },
-  pedantix: { num: 1645, tz: "Europe/Paris" },
+  // Changement de jour pour tous les jeux à 01:00 UTC (3600 s)
+  pedantle: { num: 1639, utcSec: 3600 },
+  cemantle: { num: 1684, utcSec: 3600 },
+  cemantix: { num: 1717, utcSec: 3600 },
+  pedantix: { num: 1645, utcSec: 3600 },
 };
 function dayIndex(r, t) {
   if (r.tz) {
