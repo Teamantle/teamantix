@@ -38,16 +38,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-// Numéros relevés le 13/11/2026 à 16h07 (Paris), puis +1 à chaque changement de jour.
-// Jeux anglais : bascule à 20:00 UTC (data-utc-time="72000").
-// Jeux français : bascule à minuit heure de Paris (hypothèse).
-const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
+// Numéros relevés le 13/11/2026 à 16h07 (Paris) = 15:07 UTC, puis +1 à chaque changement de jour.
+// utcSec = valeur de data-utc-time sur chaque site (heure du changement, en s depuis 00:00 UTC).
+const ANCHOR = Date.parse("2026-11-13T07:07:00Z");
 const REF = {
-  // Changement de jour pour tous les jeux à 01:00 UTC (3600 s)
-  pedantle: { num: 1639, utcSec: 3600 },
-  cemantle: { num: 1684, utcSec: 3600 },
-  cemantix: { num: 1717, utcSec: 3600 },
-  pedantix: { num: 1645, utcSec: 3600 },
+  pedantle: { num: 1639, utcSec: 72000 }, // 20:00 UTC (relevé sur le site)
+  cemantle: { num: 1684, utcSec: 72000 }, // à vérifier
+  cemantix: { num: 1717, tz: "Europe/Paris" }, // minuit Paris (supposé) → ou utcSec du site
+  pedantix: { num: 1645, tz: "Europe/Paris" }, // minuit Paris (supposé) → ou utcSec du site
 };
 function dayIndex(r, t) {
   if (r.tz) {
