@@ -1,6 +1,8 @@
-"""Teamantix — génère les codes d'équipe du jour et les écrit chiffrés dans codes.json.
+"""Teamantix — génère les codes d'équipe et les écrit chiffrés dans codes.json.
 
-Lancé chaque jour par GitHub Actions. Variable d'environnement requise :
+Lancé plusieurs fois par jour par GitHub Actions (les jeux ne changent pas de jour
+à la même heure). Un code n'est recréé que si le numéro du jour de ce jeu a changé.
+Variable d'environnement requise :
   TEAM_PASSPHRASE : phrase secrète partagée avec la team.
 """
 import base64
@@ -82,10 +84,27 @@ def create_team(db: str, n: int) -> str:
     return key.replace("-", "Ô")
 
 
+def derive(passphrase: str, salt: bytes, iterations: int) -> bytes:
+    return PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt,
+                      iterations=iterations).derive(passphrase.encode())
+
+
+def load_previous(passphrase: str) -> dict:
+    """Déchiffre le codes.json existant (s'il y en a un) pour réutiliser les codes encore valides."""
+    try:
+        with open("codes.json", encoding="utf-8") as f:
+            enc = json.load(f)
+        key = derive(passphrase, base64.b64decode(enc["salt"]), enc["iter"])
+        pt = AESGCM(key).decrypt(base64.b64decode(enc["iv"]), base64.b64decode(enc["data"]), None)
+        return json.loads(pt).get("codes", {})
+    except Exception as e:
+        print(f"Pas de codes précédents utilisables ({e})")
+        return {}
+
+
 def encrypt(payload: dict, passphrase: str) -> dict:
     salt, iv = os.urandom(16), os.urandom(12)
-    key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt,
-                     iterations=PBKDF2_ITER).derive(passphrase.encode())
+    key = derive(passphrase, salt, PBKDF2_ITER)
     ct = AESGCM(key).encrypt(iv, json.dumps(payload).encode(), None)
     b64 = lambda b: base64.b64encode(b).decode()
     return {"v": 1, "iter": PBKDF2_ITER, "salt": b64(salt), "iv": b64(iv), "data": b64(ct)}
@@ -93,19 +112,30 @@ def encrypt(payload: dict, passphrase: str) -> dict:
 
 def main():
     passphrase = os.environ["TEAM_PASSPHRASE"]
-    codes = {}
+    previous = load_previous(passphrase)
+    codes, changed = {}, False
     for game, (ref, url, db) in GAMES.items():
         try:
             n, how = site_num(url), "site"
         except Exception as e:
             n, how = today_num(ref), f"calcul (site KO : {e})"
-        print(f"{game}: jour n° {n} via {how}")
+        old = previous.get(game, {})
+        if old.get("num") == n and old.get("code"):
+            codes[game] = old
+            print(f"{game}: jour n° {n} via {how} — code inchangé")
+            continue
+        changed = True
         try:
-            codes[game] = {"num": n, "code": create_team(db, n)}
-            print(f"{game} #{n}: OK")
+            codes[game] = {"num": n, "code": create_team(db, n),
+                           "since": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            print(f"{game}: jour n° {n} via {how} — nouveau code")
         except Exception as e:  # on publie quand même les autres jeux
             codes[game] = {"num": n, "error": str(e)}
-            print(f"{game} #{n}: ERREUR {e}")
+            print(f"{game}: jour n° {n} via {how} — ERREUR {e}")
+
+    if not changed:
+        print("Aucun jeu n'a changé de jour : codes.json non modifié.")
+        return
 
     payload = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "codes": codes}
