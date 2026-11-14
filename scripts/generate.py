@@ -12,25 +12,27 @@ import random
 import re
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-# Numéros relevés le 13/11/2026 à 15:07 UTC ; +1 à chaque 01:00 UTC
-ANCHOR = datetime(2026, 11, 13, 15, 7, tzinfo=timezone.utc).timestamp()
-RESET_SEC = 3600
+# Secours si le site ne répond pas : numéros relevés le 13/11/2026 à 16:07 (Paris),
+# +1 à chaque bascule du jeu (heure de Paris) — mêmes réglages que index.html.
+PARIS = ZoneInfo("Europe/Paris")
+ANCHOR = datetime(2026, 11, 13, 16, 7, tzinfo=PARIS)
 
-# jeu: (numéro de référence pour le secours, page du jeu, base Firebase)
+# jeu: (numéro au 13/11 16h07, heure de bascule à Paris, page du jeu, base Firebase)
 GAMES = {
-    "pedantle": (1639, "https://pedantle.certitudes.org/",
+    "pedantle": (1639, 21, "https://pedantle.certitudes.org/",
                  "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
-    "cemantle": (1684, "https://cemantle.certitudes.org/",
+    "cemantle": (1684, 9, "https://cemantle.certitudes.org/",
                  "https://cemantle-default-rtdb.firebaseio.com"),
-    "cemantix": (1717, "https://cemantix.certitudes.org/",
+    "cemantix": (1717, 0, "https://cemantix.certitudes.org/",
                  "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app"),
-    "pedantix": (1645, "https://pedantix.certitudes.org/",
+    "pedantix": (1644, 0, "https://pedantix.certitudes.org/",
                  "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app"),
 }
 
@@ -38,17 +40,24 @@ PBKDF2_ITER = 200_000
 PUSH_CHARS = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
 
-def day_index(t: float) -> int:
-    return int((t - RESET_SEC) // 86400)
+def day_index(dt: datetime, reset_hour: int) -> int:
+    """Numéro de "jour de jeu" : date locale à Paris, décalée de l'heure de bascule."""
+    return (dt.astimezone(PARIS).replace(tzinfo=None) - timedelta(hours=reset_hour)).toordinal()
 
 
-def today_num(ref: int) -> int:
-    return ref + day_index(time.time()) - day_index(ANCHOR)
+def today_num(ref: int, reset_hour: int) -> int:
+    now = datetime.now(timezone.utc)
+    return ref + day_index(now, reset_hour) - day_index(ANCHOR, reset_hour)
 
 
 def site_num(url: str) -> int:
     """Lit data-puzzle-number directement sur la page du jeu."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (teamantix)"})
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+    })
     with urllib.request.urlopen(req, timeout=15) as r:
         html = r.read().decode("utf-8", "replace")
     m = re.search(r'data-puzzle-number="(\d+)"', html)
@@ -114,11 +123,11 @@ def main():
     passphrase = os.environ["TEAM_PASSPHRASE"]
     previous = load_previous(passphrase)
     codes, changed = {}, False
-    for game, (ref, url, db) in GAMES.items():
+    for game, (ref, reset, url, db) in GAMES.items():
         try:
             n, how = site_num(url), "site"
         except Exception as e:
-            n, how = today_num(ref), f"calcul (site KO : {e})"
+            n, how = today_num(ref, reset), f"calcul (site KO : {e})"
         old = previous.get(game, {})
         if old.get("num") == n and old.get("code"):
             codes[game] = old
