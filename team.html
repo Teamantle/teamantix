@@ -22,12 +22,17 @@
   button.sec { background:#3a3f4b; color:var(--fg); font-weight:400; }
   a { color:var(--mut); }
   .err { color:var(--err); } .warn { color:#e0b050; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .top a { font-size:.9em; }
   #login { display:none; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Teamantix · codes de la team</h1>
+  <div class="top">
+    <h1>Teamantix · codes de la team</h1>
+    <a href="./">← Générer d'autres codes</a>
+  </div>
   <p class="sub" id="status">Chargement…</p>
 
   <div id="login">
@@ -41,11 +46,12 @@
 
 <script>
 const URLS = {
-  pedantle: "https://pedantle.certitudes.org",
-  cemantle: "https://cemantle.certitudes.org",
   cemantix: "https://cemantix.certitudes.org",
   pedantix: "https://pedantix.certitudes.org",
+  cemantle: "https://cemantle.certitudes.org",
+  pedantle: "https://pedantle.certitudes.org",
 };
+const ORDER = Object.keys(URLS); // ordre d'affichage
 const $ = (id) => document.getElementById(id);
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const store = {
@@ -69,7 +75,9 @@ function render(p) {
   $("status").innerHTML = `Codes générés le ${gen.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}` +
     (ageH > 26 ? ` <span class="warn">— pas encore mis à jour aujourd'hui</span>` : "");
   $("codes").innerHTML = "";
-  for (const [game, c] of Object.entries(p.codes)) {
+  const games = Object.keys(p.codes).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+  for (const game of games) {
+    const c = p.codes[game];
     const el = document.createElement("div");
     el.className = "game";
     el.innerHTML = `<span class="name">${game}</span><span class="num">n° ${c.num}</span>` +
