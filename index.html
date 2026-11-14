@@ -59,26 +59,6 @@ function dayIndex(r, t) {
 const todayNum = (id) => REF[id].num + dayIndex(REF[id], Date.now()) - dayIndex(REF[id], ANCHOR);
 
 const GAMES = [
-  { id: "pedantle", url: "https://pedantle.certitudes.org", num: todayNum("pedantle"),
-    config: {
-      apiKey: "AIzaSyCB2puemt9DxsXtohEDb3RZSz6M2mJFPfo",
-      authDomain: "pedantle-c5c98.firebaseapp.com",
-      databaseURL: "https://pedantle-c5c98-default-rtdb.firebaseio.com",
-      projectId: "pedantle-c5c98",
-      storageBucket: "pedantle-c5c98.firebasestorage.app",
-      messagingSenderId: "666394869768",
-      appId: "1:666394869768:web:ea705835cc8782b0fad1bd",
-    } },
-  { id: "cemantle", url: "https://cemantle.certitudes.org", num: todayNum("cemantle"),
-    config: {
-      apiKey: "AIzaSyDJHE5kysxVrJkptZR8j9ayvVef4yysme4",
-      authDomain: "cemantle.firebaseapp.com",
-      databaseURL: "https://cemantle-default-rtdb.firebaseio.com",
-      projectId: "cemantle",
-      storageBucket: "cemantle.appspot.com",
-      messagingSenderId: "233621755818",
-      appId: "1:233621755818:web:348576e322f92e5118bdd3",
-    } },
   { id: "cemantix", url: "https://cemantix.certitudes.org", num: todayNum("cemantix"),
     config: {
       apiKey: "AIzaSyAuNU0MeepN6M6DRy-RK-dvIpmB-bjST1U",
@@ -98,6 +78,26 @@ const GAMES = [
       storageBucket: "pedantix-32f5c.firebasestorage.app",
       messagingSenderId: "1076942114014",
       appId: "1:1076942114014:web:342b77337c5545ed1f064f",
+    } },
+  { id: "cemantle", url: "https://cemantle.certitudes.org", num: todayNum("cemantle"),
+    config: {
+      apiKey: "AIzaSyDJHE5kysxVrJkptZR8j9ayvVef4yysme4",
+      authDomain: "cemantle.firebaseapp.com",
+      databaseURL: "https://cemantle-default-rtdb.firebaseio.com",
+      projectId: "cemantle",
+      storageBucket: "cemantle.appspot.com",
+      messagingSenderId: "233621755818",
+      appId: "1:233621755818:web:348576e322f92e5118bdd3",
+    } },
+  { id: "pedantle", url: "https://pedantle.certitudes.org", num: todayNum("pedantle"),
+    config: {
+      apiKey: "AIzaSyCB2puemt9DxsXtohEDb3RZSz6M2mJFPfo",
+      authDomain: "pedantle-c5c98.firebaseapp.com",
+      databaseURL: "https://pedantle-c5c98-default-rtdb.firebaseio.com",
+      projectId: "pedantle-c5c98",
+      storageBucket: "pedantle-c5c98.firebasestorage.app",
+      messagingSenderId: "666394869768",
+      appId: "1:666394869768:web:ea705835cc8782b0fad1bd",
     } },
 ];
 
