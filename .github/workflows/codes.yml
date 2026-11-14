@@ -23,7 +23,7 @@ jobs:
       - name: Générer et chiffrer les codes
         env:
           TEAM_PASSPHRASE: ${{ secrets.TEAM_PASSPHRASE }}
-        run: python generate.py
+        run: python scripts/generate.py
 
       - name: Publier codes.json
         run: |
