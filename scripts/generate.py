@@ -26,14 +26,14 @@ ANCHOR = datetime(2026, 11, 13, 16, 7, tzinfo=PARIS)
 
 # jeu: (numéro au 13/11 16h07, heure de bascule à Paris, page du jeu, base Firebase)
 GAMES = {
-    "pedantle": (1639, 21, "https://pedantle.certitudes.org/",
-                 "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
-    "cemantle": (1684, 9, "https://cemantle.certitudes.org/",
-                 "https://cemantle-default-rtdb.firebaseio.com"),
     "cemantix": (1717, 0, "https://cemantix.certitudes.org/",
                  "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app"),
     "pedantix": (1644, 0, "https://pedantix.certitudes.org/",
                  "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app"),
+    "cemantle": (1684, 9, "https://cemantle.certitudes.org/",
+                 "https://cemantle-default-rtdb.firebaseio.com"),
+    "pedantle": (1639, 21, "https://pedantle.certitudes.org/",
+                 "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
 }
 
 PBKDF2_ITER = 200_000
