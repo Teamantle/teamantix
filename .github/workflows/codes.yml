@@ -2,8 +2,7 @@ name: Codes du jour
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # TEST : toutes les 10 min
-    #- cron: "5 1 * * *"   # 01:05 UTC chaque jour
+  - cron: "0 7 * * *"   # 07:00 UTC = 8h à Paris en hiver
   workflow_dispatch:       # bouton "Run workflow" pour lancer à la main
 
 permissions:
