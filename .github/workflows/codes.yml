@@ -2,7 +2,7 @@ name: Codes du jour
 
 on:
   schedule:
-  - cron: "0 7 * * *"   # 07:00 UTC = 8h à Paris en hiver
+    - cron: "7 * * * *"   # toutes les heures (à hh:07 UTC) ; ne recrée que les codes des jeux qui ont changé de jour
   workflow_dispatch:       # bouton "Run workflow" pour lancer à la main
 
 permissions:
@@ -23,12 +23,12 @@ jobs:
       - name: Générer et chiffrer les codes
         env:
           TEAM_PASSPHRASE: ${{ secrets.TEAM_PASSPHRASE }}
-        run: python scripts/generate.py
+        run: python generate.py
 
       - name: Publier codes.json
         run: |
           git config user.name "teamantix-bot"
           git config user.email "teamantix-bot@users.noreply.github.com"
           git add codes.json
-          git commit -m "Codes du $(date -u +%F)" || echo "Rien à publier"
+          git commit -m "Codes $(date -u +'%F %H:%M')" || echo "Rien à publier"
           git push
