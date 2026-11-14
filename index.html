@@ -42,10 +42,10 @@ import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/fireba
 // reset = heure (Paris) à laquelle le jeu passe au numéro suivant.
 const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
 const REF = {
-  cemantix: { num: 1717, reset: 0 },   // minuit (confirmé : 1718 le 14/11 à 7h)
-  pedantix: { num: 1645, reset: 0 },  // minuit (confirmé : 1645 le 14/11 à 7h)
-  pedantle: { num: 1638, reset: 20 },  // à vérifier (data-utc-time=72000 → 20:00 UTC = 21h l'hiver)
-  cemantle: { num: 1683, reset: 20 },   // à vérifier
+  cemantix: { num: 1717, reset: 0 },   // minuit (1718 le 14/11 à 7h)
+  pedantix: { num: 1644, reset: 0 },   // minuit (1645 le 14/11 à 7h)
+  pedantle: { num: 1639, reset: 21 },  // soirée : 20:00 UTC (data-utc-time=72000) = 21h l'hiver
+  cemantle: { num: 1684, reset: 9 },   // pas encore changé le 14/11 à 7h37 → 9h ? (à vérifier)
 };
 function dayIndex(r, t) {
   // Date et heure locales à Paris, converties en "ms locales"
@@ -100,15 +100,6 @@ const GAMES = [
       appId: "1:1076942114014:web:342b77337c5545ed1f064f",
     } },
 ];
-
-// Numéro mémorisé {num, t} → avance automatiquement d'un par jour écoulé
-function savedNum(id) {
-  try {
-    const s = JSON.parse(store.get(id + "/numday"));
-    if (s && s.num) return s.num + Math.floor((Date.now() - s.t) / 86400000);
-  } catch {}
-  return "";
-}
 
 const store = {
   get: (k) => { try { return localStorage.getItem("teamgen/" + k); } catch { return null; } },
