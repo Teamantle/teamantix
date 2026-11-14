@@ -38,22 +38,23 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, push, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-// Numéros relevés le 13/11/2026 à 16h07 (Paris) = 15:07 UTC, puis +1 à chaque changement de jour.
-// utcSec = valeur de data-utc-time sur chaque site (heure du changement, en s depuis 00:00 UTC).
-const ANCHOR = Date.parse("2026-11-13T07:07:00Z");
+// Numéros relevés le 13/11/2026 à 16h07 heure de Paris (15:07 UTC).
+// reset = heure (Paris) à laquelle le jeu passe au numéro suivant.
+const ANCHOR = Date.parse("2026-11-13T15:07:00Z");
 const REF = {
-  pedantle: { num: 1639, utcSec: 72000 }, // 20:00 UTC (relevé sur le site)
-  cemantle: { num: 1684, utcSec: 72000 }, // à vérifier
-  cemantix: { num: 1717, tz: "Europe/Paris" }, // minuit Paris (supposé) → ou utcSec du site
-  pedantix: { num: 1645, tz: "Europe/Paris" }, // minuit Paris (supposé) → ou utcSec du site
+  cemantix: { num: 1717, reset: 0 },   // minuit (confirmé : 1718 le 14/11 à 7h)
+  pedantix: { num: 1645, reset: 0 },  // minuit (confirmé : 1645 le 14/11 à 7h)
+  pedantle: { num: 1639, reset: 21 },  // à vérifier (data-utc-time=72000 → 20:00 UTC = 21h l'hiver)
+  cemantle: { num: 1684, reset: 0 },   // à vérifier
 };
 function dayIndex(r, t) {
-  if (r.tz) {
-    const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: r.tz })
-      .format(t).split("-").map(Number);
-    return Date.UTC(y, m - 1, d) / 86400000;
-  }
-  return Math.floor((t / 1000 - r.utcSec) / 86400);
+  // Date et heure locales à Paris, converties en "ms locales"
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(t).map((x) => [x.type, x.value]));
+  const local = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+  return Math.floor((local - r.reset * 3600e3) / 86400e3);
 }
 const todayNum = (id) => REF[id].num + dayIndex(REF[id], Date.now()) - dayIndex(REF[id], ANCHOR);
 
