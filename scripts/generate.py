@@ -11,6 +11,7 @@ import os
 import random
 import re
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -111,6 +112,20 @@ def load_previous(passphrase: str) -> dict:
         return {}
 
 
+def create_team_retry(db: str, n: int) -> tuple[int, str]:
+    """Essaie n, puis n+1, puis n-1 : la base refuse (401) tout numéro qui n'est pas celui du jour."""
+    last = None
+    for cand in (n, n + 1, n - 1):
+        try:
+            return cand, create_team(db, cand)
+        except urllib.error.HTTPError as e:
+            if e.code not in (401, 403):
+                raise
+            last = e
+            print(f"  n° {cand} refusé ({e.code})")
+    raise RuntimeError(f"numéros {n - 1} à {n + 1} refusés ({last})")
+
+
 def encrypt(payload: dict, passphrase: str) -> dict:
     salt, iv = os.urandom(16), os.urandom(12)
     key = derive(passphrase, salt, PBKDF2_ITER)
@@ -129,15 +144,19 @@ def main():
         except Exception as e:
             n, how = today_num(ref, reset), f"calcul (site KO : {e})"
         old = previous.get(game, {})
-        if old.get("num") == n and old.get("code"):
+        # "asked" = numéro calculé/lu au départ, avant une éventuelle correction ±1
+        if old.get("code") and n in (old.get("num"), old.get("asked")):
             codes[game] = old
             print(f"{game}: jour n° {n} via {how} — code inchangé")
             continue
         changed = True
         try:
-            codes[game] = {"num": n, "code": create_team(db, n),
+            good, code = create_team_retry(db, n)
+            if good != n:
+                how += f", corrigé {n} → {good}"
+            codes[game] = {"num": good, "asked": n, "code": code,
                            "since": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-            print(f"{game}: jour n° {n} via {how} — nouveau code")
+            print(f"{game}: jour n° {good} via {how} — nouveau code")
         except Exception as e:  # on publie quand même les autres jeux
             codes[game] = {"num": n, "error": str(e)}
             print(f"{game}: jour n° {n} via {how} — ERREUR {e}")
