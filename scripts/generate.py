@@ -51,8 +51,7 @@ def today_num(ref: int, reset_hour: int) -> int:
     return ref + day_index(now, reset_hour) - day_index(ANCHOR, reset_hour)
 
 
-def site_num(url: str) -> int:
-    """Lit data-puzzle-number directement sur la page du jeu."""
+def fetch_page(url: str) -> str:
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                       "(KHTML, like Gecko) Chrome/131.0 Safari/537.36",
@@ -60,7 +59,11 @@ def site_num(url: str) -> int:
         "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
     })
     with urllib.request.urlopen(req, timeout=15) as r:
-        html = r.read().decode("utf-8", "replace")
+        return r.read().decode("utf-8", "replace")
+
+
+def site_num(html: str) -> int:
+    """Lit data-puzzle-number dans la page du jeu."""
     m = re.search(r'data-puzzle-number="(\d+)"', html)
     if not m:
         raise RuntimeError("numéro introuvable dans la page")
@@ -139,14 +142,22 @@ def main():
     previous = load_previous(passphrase)
     codes, changed = {}, False
     for game, (ref, reset, url, db) in GAMES.items():
+        title_words = None
         try:
-            n, how = site_num(url), "site"
+            html = fetch_page(url)
+            n, how = site_num(html), "site"
+            if game.startswith("pedant"):
+                # mots du titre de la page secrète (pour détecter "trouvé" sur team.html)
+                title_words = len(re.findall(r'class="h w"', html)) or None
         except Exception as e:
             n, how = today_num(ref, reset), f"calcul (site KO : {e})"
         old = previous.get(game, {})
         # "asked" = numéro calculé/lu au départ, avant une éventuelle correction +1
         if old.get("code") and n in (old.get("num"), old.get("asked")):
             codes[game] = old
+            if title_words and not old.get("titleWords"):
+                codes[game]["titleWords"] = title_words
+                changed = True
             print(f"{game}: jour n° {n} via {how} — code inchangé")
             continue
         changed = True
@@ -156,6 +167,8 @@ def main():
                 how += f", corrigé {n} → {good}"
             codes[game] = {"num": good, "asked": n, "code": code,
                            "since": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            if title_words and good == n:  # page lue = page du jour retenu
+                codes[game]["titleWords"] = title_words
             print(f"{game}: jour n° {good} via {how} — nouveau code")
         except Exception as e:  # on publie quand même les autres jeux
             codes[game] = {"num": n, "error": str(e)}
