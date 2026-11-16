@@ -113,9 +113,9 @@ def load_previous(passphrase: str) -> dict:
 
 
 def create_team_retry(db: str, n: int) -> tuple[int, str]:
-    """Essaie n, puis n+1, puis n-1 : la base refuse (401) tout numéro qui n'est pas celui du jour."""
+    """Essaie n, puis n+1 : la base refuse (401) tout numéro qui n'est pas celui du jour."""
     last = None
-    for cand in (n, n + 1, n - 1):
+    for cand in (n, n + 1):
         try:
             return cand, create_team(db, cand)
         except urllib.error.HTTPError as e:
@@ -123,7 +123,7 @@ def create_team_retry(db: str, n: int) -> tuple[int, str]:
                 raise
             last = e
             print(f"  n° {cand} refusé ({e.code})")
-    raise RuntimeError(f"numéros {n - 1} à {n + 1} refusés ({last})")
+    raise RuntimeError(f"numéros {n} et {n + 1} refusés ({last})")
 
 
 def encrypt(payload: dict, passphrase: str) -> dict:
@@ -144,7 +144,7 @@ def main():
         except Exception as e:
             n, how = today_num(ref, reset), f"calcul (site KO : {e})"
         old = previous.get(game, {})
-        # "asked" = numéro calculé/lu au départ, avant une éventuelle correction ±1
+        # "asked" = numéro calculé/lu au départ, avant une éventuelle correction +1
         if old.get("code") and n in (old.get("num"), old.get("asked")):
             codes[game] = old
             print(f"{game}: jour n° {n} via {how} — code inchangé")
