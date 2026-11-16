@@ -24,6 +24,8 @@
   .err { color:var(--err); } .warn { color:#e0b050; }
   .top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
   .top a { font-size:.9em; }
+  .state { flex-basis:100%; font-size:.9em; color:var(--mut); margin-top:-2px; }
+  .state.on { color:#e0b050; } .state.done { color:var(--acc); }
   #login { display:none; }
 </style>
 </head>
@@ -52,6 +54,14 @@ const URLS = {
   pedantle: "https://pedantle.certitudes.org",
 };
 const ORDER = Object.keys(URLS); // ordre d'affichage
+// Bases Firebase des jeux (publiques, déjà présentes dans le code des sites)
+const DB = {
+  cemantix: "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app",
+  pedantix: "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app",
+  cemantle: "https://cemantle-default-rtdb.firebaseio.com",
+  pedantle: "https://pedantle-c5c98-default-rtdb.firebaseio.com",
+};
+const REFRESH_MS = 30000;
 const $ = (id) => document.getElementById(id);
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const store = {
@@ -85,15 +95,73 @@ function render(p) {
         ? `<span class="code">${c.code}</span> <button class="sec">Copier</button>
            <a href="${URLS[game]}" target="_blank" rel="noopener">jouer ↗</a>`
         : `<span class="err">indisponible (${c.error})</span>`);
+    if (c.code) {
+      const st = document.createElement("span");
+      st.className = "state";
+      st.dataset.game = game;
+      st.textContent = "…";
+      el.appendChild(st);
+    }
     const btn = el.querySelector("button");
     if (btn) btn.onclick = async () => {
       try { await navigator.clipboard.writeText(c.code); btn.textContent = "Copié"; } catch {}
     };
     $("codes").appendChild(el);
   }
+  CURRENT = p;
+  refreshStates();
   $("foot").innerHTML = `Dans le jeu : ☁️ › colle le code › Join. <a href="#" id="logout">Oublier la phrase</a>`;
   $("logout").onclick = (e) => { e.preventDefault(); store.del("teamantix/pass"); location.hash = ""; location.reload(); };
 }
+
+let CURRENT = null, timer = null;
+
+// Lit l'équipe dans la base du jeu (comme le fait le site) — aucun mot n'est affiché
+async function teamState(game, c) {
+  const key = encodeURIComponent(c.code.replace(/Ô/g, "-"));
+  const r = await fetch(`${DB[game]}/g/${c.num}/${key}.json`, { cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const data = await r.json();
+  if (!data) return { gone: true };
+  const online = Math.max(0, (data._users || 0) - 1); // le bot compte pour 1 à la création
+  delete data._users;
+  const guesses = Object.values(data);
+  let solved = false;
+  if (game === "cemantix" || game === "cemantle") {
+    // score = [température, rang] ; rang 1000 = mot secret
+    solved = guesses.some((v) => Array.isArray(v) && v[1] === 1000);
+  } else if (c.titleWords) {
+    // score = {position: mot révélé | proximité} ; positions 0..n-1 = mots du titre
+    const found = new Set();
+    for (const v of guesses)
+      if (v && typeof v === "object")
+        for (const [pos, x] of Object.entries(v)) if (typeof x === "string") found.add(+pos);
+    solved = [...Array(c.titleWords).keys()].every((i) => found.has(i));
+  }
+  return { words: guesses.length, online, solved };
+}
+
+async function refreshStates() {
+  if (!CURRENT) return;
+  await Promise.all(Object.entries(CURRENT.codes).map(async ([game, c]) => {
+    const el = document.querySelector(`.state[data-game="${game}"]`);
+    if (!el) return;
+    try {
+      const s = await teamState(game, c);
+      const who = s.online ? ` · ${s.online} en ligne` : "";
+      el.className = "state";
+      if (s.gone) el.textContent = "équipe fermée";
+      else if (s.solved) { el.className += " done"; el.textContent = `✅ trouvé en ${s.words} mot${s.words > 1 ? "s" : ""}${who}`; }
+      else if (s.words) { el.className += " on"; el.textContent = `🟠 en cours · ${s.words} mot${s.words > 1 ? "s" : ""}${who}`; }
+      else el.textContent = `⚪ pas commencé${who}`;
+    } catch (e) {
+      el.textContent = "état indisponible";
+    }
+  }));
+  clearTimeout(timer);
+  timer = setTimeout(refreshStates, REFRESH_MS);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshStates(); });
 
 async function main() {
   let enc;
