@@ -29,7 +29,7 @@ ANCHOR = datetime(2026, 11, 13, 16, 7, tzinfo=PARIS)
 GAMES = {
     "cemantix": (1717, 0, "https://cemantix.certitudes.org/",
                  "https://cemantix-11e28-default-rtdb.europe-west1.firebasedatabase.app"),
-    "pedantix": (1645, 0, "https://pedantix.certitudes.org/",
+    "pedantix": (1645, 11, "https://pedantix.certitudes.org/",
                  "https://pedantix-32f5c-default-rtdb.europe-west1.firebasedatabase.app"),
     "pedantle": (1639, 21, "https://pedantle.certitudes.org/",
                  "https://pedantle-c5c98-default-rtdb.firebaseio.com"),
