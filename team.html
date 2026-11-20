@@ -24,9 +24,18 @@
   .err { color:var(--err); } .warn { color:#e0b050; }
   .top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
   .top a { font-size:.9em; }
-  .state { flex-basis:100%; font-size:.9em; color:var(--mut); margin-top:-2px; }
+  .state { flex-basis:100%; font-size:.9em; color:var(--mut); margin:-2px 0 0 56px; }
   .state.on { color:#e0b050; } .state.done { color:var(--acc); }
   #login { display:none; }
+
+  /* Anneau de progression */
+  .ring { width:44px; height:44px; flex:none; }
+  .ring .track { fill:none; stroke:#2d313b; stroke-width:5; }
+  .ring .bar { fill:none; stroke-width:5; stroke-linecap:round; opacity:0;
+               transition:stroke-dashoffset .9s ease, stroke .9s ease, opacity .3s; }
+  .ring text { fill:var(--fg); font-size:11px; font-weight:700;
+               text-anchor:middle; dominant-baseline:central; }
+  .ring.done .bar { filter:drop-shadow(0 0 3px var(--acc)); }
 </style>
 </head>
 <body>
@@ -79,6 +88,49 @@ async function decrypt(enc, pass) {
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
+// ---------- Anneau de progression ----------
+const CIRC = 2 * Math.PI * 18;
+
+function ringHTML(game) {
+  return `<svg class="ring" data-game="${game}" viewBox="0 0 44 44" aria-hidden="true">
+    <circle class="track" cx="22" cy="22" r="18"/>
+    <circle class="bar" cx="22" cy="22" r="18" transform="rotate(-90 22 22)"
+            stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
+    <text x="22" y="22">–</text></svg>`;
+}
+
+// p ∈ [0,1] ; couleur : bleu glacé → violet → rouge brûlant, vert si trouvé
+function setRing(svg, p, label, solved) {
+  p = Math.max(0, Math.min(1, p || 0));
+  const bar = svg.querySelector(".bar");
+  bar.style.strokeDashoffset = CIRC * (1 - p);
+  bar.style.stroke = solved ? "var(--acc)" : `hsl(${210 + 150 * p} 80% 60%)`;
+  bar.style.opacity = p > 0 ? 1 : 0;
+  svg.classList.toggle("done", !!solved);
+  svg.querySelector("text").textContent = label;
+}
+
+// Mêmes paliers que l'affichage de Cémantix
+function mood(rank, temp) {
+  if (rank >= 1000) return "🥳";
+  if (rank >= 999) return "😱";
+  if (rank >= 990) return "🔥";
+  if (rank >= 900) return "🥵";
+  if (rank >= 1) return "😎";
+  return temp >= 0 ? "🥶" : "🧊";
+}
+
+// ---------- Copie ----------
+async function copyCode(code, btn) {
+  try {
+    await navigator.clipboard.writeText(code);
+    if (btn) {
+      btn.textContent = "Copié";
+      setTimeout(() => (btn.textContent = "Copier"), 2000);
+    }
+  } catch {}
+}
+
 function render(p) {
   const gen = new Date(p.generated);
   const ageH = (Date.now() - gen) / 36e5;
@@ -90,10 +142,11 @@ function render(p) {
     const c = p.codes[game];
     const el = document.createElement("div");
     el.className = "game";
-    el.innerHTML = `<span class="name">${game}</span><span class="num">n° ${c.num}</span>` +
+    el.innerHTML = (c.code ? ringHTML(game) : `<span class="ring"></span>`) +
+      `<span class="name">${game}</span><span class="num">n° ${c.num}</span>` +
       (c.code
         ? `<span class="code">${c.code}</span> <button class="sec">Copier</button>
-           <a href="${URLS[game]}" target="_blank" rel="noopener">jouer ↗</a>`
+           <a class="play" href="${URLS[game]}" target="_blank" rel="noopener">jouer ↗</a>`
         : `<span class="err">indisponible (${c.error})</span>`);
     if (c.code) {
       const st = document.createElement("span");
@@ -103,14 +156,15 @@ function render(p) {
       el.appendChild(st);
     }
     const btn = el.querySelector("button");
-    if (btn) btn.onclick = async () => {
-      try { await navigator.clipboard.writeText(c.code); btn.textContent = "Copié"; } catch {}
-    };
+    if (btn) btn.onclick = () => copyCode(c.code, btn);
+    // Clic sur "jouer" : copie le code puis laisse le lien s'ouvrir normalement
+    const play = el.querySelector("a.play");
+    if (play) play.addEventListener("click", () => copyCode(c.code, btn));
     $("codes").appendChild(el);
   }
   CURRENT = p;
   refreshStates();
-  $("foot").innerHTML = `Dans le jeu : ☁️ › colle le code › Join. <a href="#" id="logout">Oublier la phrase</a>`;
+  $("foot").innerHTML = `« jouer ↗ » copie le code. Dans le jeu : ☁️ › colle le code › Join. <a href="#" id="logout">Oublier la phrase</a>`;
   $("logout").onclick = (e) => { e.preventDefault(); store.del("teamantix/pass"); location.hash = ""; location.reload(); };
 }
 
@@ -126,33 +180,65 @@ async function teamState(game, c) {
   const online = Math.max(0, (data._users || 0) - 1); // le bot compte pour 1 à la création
   delete data._users;
   const guesses = Object.values(data);
-  let solved = false;
+  const s = { words: guesses.length, online, solved: false, p: 0, label: "–", detail: "" };
+
   if (game === "cemantix" || game === "cemantle") {
-    // score = [température, rang] ; rang 1000 = mot secret
-    solved = guesses.some((v) => Array.isArray(v) && v[1] === 1000);
-  } else if (c.titleWords) {
+    // score = [température, rang] ; rang 1..1000 (top 1000), 1000 = mot secret
+    let best = 0, temp = -Infinity;
+    for (const v of guesses) {
+      if (!Array.isArray(v)) continue;
+      if (typeof v[1] === "number") best = Math.max(best, v[1]);
+      if (typeof v[0] === "number") temp = Math.max(temp, v[0]);
+    }
+    s.solved = best >= 1000;
+    s.p = best / 1000;
+    s.label = s.solved ? "🥳" : best ? String(best) : "–";
+    if (guesses.length) {
+      const t = Math.abs(temp) <= 1 ? temp * 100 : temp; // selon le stockage (0.34 ou 34)
+      s.detail = `meilleur ${mood(best, temp)} ` +
+        (best ? `${best} ‰` : isFinite(t) ? `${t.toFixed(2).replace(".", ",")} °C` : "");
+    }
+  } else {
     // score = {position: mot révélé | proximité} ; positions 0..n-1 = mots du titre
     const found = new Set();
     for (const v of guesses)
       if (v && typeof v === "object")
         for (const [pos, x] of Object.entries(v)) if (typeof x === "string") found.add(+pos);
-    solved = [...Array(c.titleWords).keys()].every((i) => found.has(i));
+    const n = c.titleWords || 0;
+    const revealed = [...found].filter((i) => i >= n).length;
+    if (n) {
+      const k = [...Array(n).keys()].filter((i) => found.has(i)).length;
+      s.solved = k === n;
+      s.p = k / n;
+      s.label = s.solved ? "🥳" : `${k}/${n}`;
+      s.detail = `titre ${k}/${n}`;
+    } else {
+      s.label = "?";
+    }
+    if (revealed) s.detail += `${s.detail ? " · " : ""}${revealed} mot${revealed > 1 ? "s" : ""} révélé${revealed > 1 ? "s" : ""}`;
   }
-  return { words: guesses.length, online, solved };
+  return s;
 }
 
 async function refreshStates() {
   if (!CURRENT) return;
   await Promise.all(Object.entries(CURRENT.codes).map(async ([game, c]) => {
     const el = document.querySelector(`.state[data-game="${game}"]`);
+    const ring = document.querySelector(`svg.ring[data-game="${game}"]`);
     if (!el) return;
     try {
       const s = await teamState(game, c);
       const who = s.online ? ` · ${s.online} en ligne` : "";
+      const nb = `${s.words} mot${s.words > 1 ? "s" : ""}`;
       el.className = "state";
-      if (s.gone) el.textContent = "équipe fermée";
-      else if (s.solved) { el.className += " done"; el.textContent = `✅ trouvé en ${s.words} mot${s.words > 1 ? "s" : ""}${who}`; }
-      else if (s.words) { el.className += " on"; el.textContent = `🟠 en cours · ${s.words} mot${s.words > 1 ? "s" : ""}${who}`; }
+      if (s.gone) {
+        el.textContent = "équipe fermée";
+        if (ring) setRing(ring, 0, "×", false);
+        return;
+      }
+      if (ring) setRing(ring, s.p, s.label, s.solved);
+      if (s.solved) { el.className += " done"; el.textContent = `✅ trouvé en ${nb}${who}`; }
+      else if (s.words) { el.className += " on"; el.textContent = `🟠 en cours · ${nb}${s.detail ? " · " + s.detail : ""}${who}`; }
       else el.textContent = `⚪ pas commencé${who}`;
     } catch (e) {
       el.textContent = "état indisponible";
